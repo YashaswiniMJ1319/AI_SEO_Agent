@@ -1,0 +1,20 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+
+# Docker volumes
+data/
+infra/pgdata/
+infra/miniotdata/
+
+# Build
+dist
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
