@@ -1,15 +1,15 @@
-# File: infra/docker/api.Dockerfile
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy only package.json first
 COPY package*.json ./
-
 RUN npm install
 
-# Copy the rest of the API source code
+# Copy everything else
 COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
 
 EXPOSE 4000
 
