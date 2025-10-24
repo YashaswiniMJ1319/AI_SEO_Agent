@@ -5,9 +5,9 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-screen bg-gradient-to-br from-indigo-900 via-gray-900 to-black text-white overflow-hidden">
-      {/* 🌟 Top-right corner buttons */}
-      <div className="absolute top-6 right-6 flex gap-4">
+    <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-indigo-900 via-gray-900 to-black text-white relative overflow-hidden">
+      {/* 🌟 Top-left corner buttons */}
+      <div className="absolute top-6 left-6 flex gap-4">
         <button
           onClick={() => navigate("/login")}
           className="px-5 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition font-semibold shadow-md"
@@ -23,27 +23,21 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* ✨ Center content */}
+      {/* ✨ Center Content */}
       <div className="text-center px-6">
         <h1 className="text-5xl font-extrabold mb-4">
           Welcome to <span className="text-indigo-400">AI Agent</span>
         </h1>
         <p className="text-lg text-gray-300 max-w-xl mx-auto">
-          Empower your SEO strategy with smart automation and insights powered by AI.
+          Your intelligent SEO optimization companion powered by AI.
         </p>
 
         <button
           onClick={() => alert("🚀 Starting AI Assistant...")}
-          className="mt-8 px-8 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition font-semibold shadow-lg"
+          className="mt-8 px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition font-semibold shadow-lg"
         >
           Get Started
         </button>
-      </div>
-
-      {/* 🌌 Decorative background blobs */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-indigo-700 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-700 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
       </div>
     </div>
   );
