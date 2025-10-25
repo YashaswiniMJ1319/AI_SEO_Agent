@@ -1,4 +1,5 @@
 {
+  "publisher": "yashaswinimj1319",
   "name": "ai-seo-agent-vscode",
   "displayName": "AI SEO Agent",
   "description": "VS Code extension for the AI SEO Agent SaaS platform",
@@ -37,8 +38,8 @@
     ],
     "authentication": [
       {
-        "id": "ai-seo-agent-auth", 
-        "label": "AI SEO Agent"    
+        "id": "ai-seo-agent-auth",
+        "label": "AI SEO Agent"
       }
     ]
   },
@@ -73,3 +74,4 @@
     "uuid": "^13.0.0"
   }
 }
+
