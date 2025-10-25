@@ -4,8 +4,12 @@ import { TokenManager } from './tokenManager';
 // --- Configuration ---
 export const AUTH_PROVIDER_ID = 'ai-seo-agent-auth';
 export const AUTH_PROVIDER_LABEL = 'AI SEO Agent';
-export const EXTENSION_ID = 'ai-seo-agent-vscode';
+// --- THIS IS THE FIX ---
+// It MUST match the 'publisher.name' from package.json
+export const EXTENSION_ID = 'yashaswinimj1319.ai-seo-agent-vscode';
+// --- THIS FIXES THE BUILD ERROR ---
 const AUTH_CALLBACK_PATH = 'auth-callback';
+// ------------------------
 
 const getWebAppBaseUrl = (): string => {
     // TODO: Make this configurable via settings
@@ -64,7 +68,6 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         if (this._uuidModule) {
             return this._uuidModule;
         }
-        // Wait for the promise if loading is in progress, or start loading if not yet started
         return await (this._uuidPromise || this._initializeUuid());
     }
 
@@ -75,21 +78,19 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         return sessionChangeEmitter.event;
     }
 
-    // getSessions Implementation (Single)
     public async getSessions(
         scopes?: readonly string[],
         options?: vscode.AuthenticationProviderSessionOptions
-    ): Promise<vscode.AuthenticationSession[]> { // Return mutable array
+    ): Promise<vscode.AuthenticationSession[]> {
         console.log('AuthProvider: getSessions called.');
         const token = await TokenManager.instance.getToken();
         if (token) {
-            const session = this.createSessionHelper(token, "Logged In User"); // Use helper
-            return [session]; // Return mutable array
+            const session = this.createSessionHelper(token, "Logged In User");
+            return [session];
         }
         return [];
     }
 
-    // createSession Implementation (Single)
     public async createSession(
         scopes?: readonly string[],
         options?: vscode.AuthenticationProviderSessionOptions
@@ -97,18 +98,19 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         console.log('AuthProvider: createSession called.');
         let uuid;
         try {
-            uuid = await this._getUuid(); // Get the loaded module instance
+            uuid = await this._getUuid();
         } catch (error) {
              throw new Error("UUID library failed to load, cannot proceed with login.");
         }
 
         try {
-            const nonce = uuid.v4(); // Use v4 from the loaded module
+            const nonce = uuid.v4();
 
+            // Use the *correct* EXTENSION_ID (which now includes the publisher)
             const callbackUri = await vscode.env.asExternalUri(
                 vscode.Uri.parse(`${vscode.env.uriScheme}://${EXTENSION_ID}/${AUTH_CALLBACK_PATH}`)
             );
-            console.log('Callback URI:', callbackUri.toString(true));
+            console.log('Callback URI:', callbackUri.toString(true)); // This will now be vscode://yashaswinimj1319.ai-seo-agent-vscode/...
 
             const loginUrl = new URL('/auth/vscode-login', getWebAppBaseUrl());
             loginUrl.searchParams.set('callback', callbackUri.toString(true));
@@ -130,7 +132,6 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
                             this._callbackPromises.delete(nonce);
                             reject(new Error('Login cancelled by user.'));
                         });
-                        // Optional: Add timeout logic here if desired
                     });
                 }
             );
@@ -140,7 +141,7 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
             }
 
             await TokenManager.instance.setToken(token);
-            const session = this.createSessionHelper(token, "Logged In User (New)"); // Use helper
+            const session = this.createSessionHelper(token, "Logged In User (New)");
             sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
             vscode.window.showInformationMessage('Successfully logged in via browser!');
             return session;
@@ -149,40 +150,37 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
             console.error('Error during createSession:', err);
             vscode.window.showErrorMessage(`Login failed: ${err.message || 'An unexpected error occurred.'}`);
             await TokenManager.instance.deleteToken();
-            const existingSessions = await this.getSessions(); // Re-fetch sessions after clearing token
+            const existingSessions = await this.getSessions();
             sessionChangeEmitter.fire({ added: [], removed: existingSessions, changed: [] });
-            throw err; // Re-throw the error so getSession call also fails
+            throw err;
         }
     }
 
-    // removeSession Implementation (Single)
     public async removeSession(sessionId: string): Promise<void> {
         console.log(`AuthProvider: removeSession called for ID: ${sessionId}`);
         const currentToken = await TokenManager.instance.getToken();
-        if (currentToken === sessionId || !sessionId) { // Allow removing even if ID doesn't perfectly match, just clear token
-            const existingSessions = await this.getSessions(); // Get session info *before* deleting token
+        if (currentToken === sessionId || !sessionId) {
+            const existingSessions = await this.getSessions();
             if (existingSessions.length > 0) {
                  await TokenManager.instance.deleteToken();
                  sessionChangeEmitter.fire({ added: [], removed: existingSessions, changed: [] });
                  vscode.window.showInformationMessage('Successfully logged out.');
             } else {
                  console.log('No active session found to log out.');
-                 // Optionally clear token anyway if somehow out of sync
                  await TokenManager.instance.deleteToken();
             }
         } else {
             console.warn('Attempted to remove a session ID that does not match the stored token.');
-            // Optionally still clear the token if desired
-            // await TokenManager.instance.deleteToken();
-            // sessionChangeEmitter.fire({ added: [], removed: await this.getSessions(), changed: [] });
         }
     }
 
-    // handleUri Implementation (Single)
     public async handleUri(uri: vscode.Uri): Promise<void> {
+        // This log should finally appear!
         console.log(`AuthProvider: handleUri called with: ${uri.toString(true)}`);
-        if (uri.path !== `/${AUTH_CALLBACK_PATH}`) {
-             console.warn(`handleUri received unexpected path: ${uri.path}`);
+
+        // Check against the *correct* full extension ID
+        if (uri.authority !== EXTENSION_ID || uri.path !== `/${AUTH_CALLBACK_PATH}`) {
+             console.warn(`handleUri received unexpected authority/path: ${uri.authority}${uri.path}`);
              return;
         }
 
@@ -190,7 +188,7 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
             const query = new URLSearchParams(uri.query);
             const token = query.get('token');
             const error = query.get('error');
-            const nonce = query.get('nonce'); // Retrieve the nonce
+            const nonce = query.get('nonce');
 
             if (!nonce) {
                 console.error('Callback URI missing nonce.');
@@ -208,12 +206,10 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
             }
         } catch (err: any) {
             console.error('Error parsing callback URI:', err);
-            // Attempt to reject any pending promise, although we don't know the nonce here
              this.rejectAnyPending(`Failed to process authentication response: ${err.message}`);
         }
     }
 
-    // Helper to resolve/reject a specific pending promise
     private resolveOrRejectPending(nonce: string, token: string | undefined, error: Error | undefined): void {
         const promiseCallbacks = this._callbackPromises.get(nonce);
         if (promiseCallbacks) {
@@ -222,16 +218,13 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
             } else {
                 promiseCallbacks.reject(error || new Error('Unknown authentication error.'));
             }
-            this._callbackPromises.delete(nonce); // Clean up
+            this._callbackPromises.delete(nonce);
         } else {
-            // This can happen if the user cancels the progress notification or if it times out
             console.warn(`No callback promise found for nonce: ${nonce}. Might have timed out, been cancelled, or already resolved/rejected.`);
-             // Show error only if an error was actually passed back and we couldn't find the promise
              if (error) { vscode.window.showErrorMessage(`Authentication Error: ${error.message}`);}
         }
     }
 
-    // Helper to reject *any* pending promise (use if nonce is unknown)
     private rejectAnyPending(errorMessage: string): void {
         const error = new Error(errorMessage);
         this._callbackPromises.forEach((callbacks) => {
@@ -240,19 +233,15 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         this._callbackPromises.clear();
     }
 
-
-    // Renamed helper function to avoid conflict with method name
     private createSessionHelper(token: string, userLabel: string): vscode.AuthenticationSession {
-        // In a real scenario, decode JWT `token` here to get actual user info (ID, name) and expiration
         return {
-            id: token, // Using token as session ID for simplicity
+            id: token,
             accessToken: token,
-            account: { id: userLabel, label: userLabel }, // Replace with actual user data from token
-            scopes: [], // Add scopes if you use them
+            account: { id: userLabel, label: userLabel },
+            scopes: [],
         };
     }
 
-    // dispose Implementation (Single)
     public dispose() {
         this._disposable.dispose();
          this._callbackPromises.forEach((callbacks, nonce) => {
