@@ -5,7 +5,7 @@
   "description": "VS Code extension for the AI SEO Agent SaaS platform",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Linters",
@@ -15,7 +15,8 @@
     "onCommand:ai-seo-agent-vscode.login",
     "onCommand:ai-seo-agent-vscode.logout",
     "onCommand:ai-seo-agent-vscode.analyzeFile",
-    "onAuthenticationRequest:ai-seo-agent-auth"
+    "onAuthenticationRequest:ai-seo-agent-auth",
+    "onUri"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -58,7 +59,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/uuid": "^10.0.0",
-    "@types/vscode": "^1.105.0",
+    "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.45.0",
     "@typescript-eslint/parser": "^8.45.0",
     "@vscode/test-cli": "^0.0.11",

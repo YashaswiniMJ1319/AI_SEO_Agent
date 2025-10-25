@@ -4,10 +4,8 @@ import { TokenManager } from './tokenManager';
 // --- Configuration ---
 export const AUTH_PROVIDER_ID = 'ai-seo-agent-auth';
 export const AUTH_PROVIDER_LABEL = 'AI SEO Agent';
-// --- THIS IS THE FIX ---
-// It MUST match the 'publisher.name' from package.json
+// Ensure this matches your package.json 'publisher.name'
 export const EXTENSION_ID = 'yashaswinimj1319.ai-seo-agent-vscode';
-// --- THIS FIXES THE BUILD ERROR ---
 const AUTH_CALLBACK_PATH = 'auth-callback';
 // ------------------------
 
@@ -27,47 +25,56 @@ type UuidModule = {
 /**
  * Implements VS Code's AuthenticationProvider interface for AI SEO Agent.
  */
+// --- START OF SINGLE CLASS DEFINITION ---
 export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.Disposable {
-    private _disposable: vscode.Disposable;
     private _callbackPromises = new Map<string, { resolve: (token: string) => void; reject: (reason?: any) => void }>();
     // Store the dynamically imported module instance
     private _uuidModule: UuidModule | undefined;
     private _uuidPromise: Promise<UuidModule> | undefined; // To handle concurrent loads
 
     constructor(private context: vscode.ExtensionContext) {
-        this._disposable = vscode.window.registerUriHandler({
-            handleUri: this.handleUri.bind(this) // Use bind here!
-        });
-        // Start loading uuid asynchronously
+        // URI Handler registration is moved to extension.ts
         this._initializeUuid();
+        console.log("AISEOAuthProvider constructed."); // Log construction
     }
 
     // Helper to load uuid safely
     private _initializeUuid(): Promise<UuidModule> {
         if (!this._uuidPromise) {
             this._uuidPromise = import('uuid').then(module => {
-                if (typeof module?.v4 === 'function') {
-                    this._uuidModule = module as UuidModule;
+                // Ensure the imported module has the expected structure
+                const uuidModule = module as unknown as UuidModule;
+                if (typeof uuidModule?.v4 === 'function') {
+                    this._uuidModule = uuidModule;
                     console.log('UUID module loaded successfully.');
                     return this._uuidModule;
                 } else {
+                    // Handle cases where default import might be needed or structure differs
+                    const maybeDefault = module as any;
+                    if (maybeDefault.default && typeof maybeDefault.default.v4 === 'function') {
+                        console.warn("UUID loaded via default import.");
+                        this._uuidModule = maybeDefault.default as UuidModule;
+                        return this._uuidModule;
+                    }
                     throw new Error("Imported 'uuid' module does not contain a 'v4' function.");
                 }
             }).catch(error => {
                 console.error("Failed to load UUID module:", error);
                 vscode.window.showErrorMessage("AI SEO Agent failed to load a required library (UUID). Authentication may fail.");
                 this._uuidPromise = undefined; // Allow retry
-                throw error;
+                throw error; // Re-throw to propagate the error
             });
         }
         return this._uuidPromise;
     }
+
 
     // Helper to get the loaded uuid module
     private async _getUuid(): Promise<UuidModule> {
         if (this._uuidModule) {
             return this._uuidModule;
         }
+        // If loading is in progress, await it; otherwise, start loading.
         return await (this._uuidPromise || this._initializeUuid());
     }
 
@@ -81,14 +88,14 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
     public async getSessions(
         scopes?: readonly string[],
         options?: vscode.AuthenticationProviderSessionOptions
-    ): Promise<vscode.AuthenticationSession[]> {
+    ): Promise<vscode.AuthenticationSession[]> { // Removed readonly
         console.log('AuthProvider: getSessions called.');
         const token = await TokenManager.instance.getToken();
         if (token) {
             const session = this.createSessionHelper(token, "Logged In User");
-            return [session];
+            return [session]; // Return mutable array
         }
-        return [];
+        return []; // Return mutable array
     }
 
     public async createSession(
@@ -105,12 +112,10 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
 
         try {
             const nonce = uuid.v4();
-
-            // Use the *correct* EXTENSION_ID (which now includes the publisher)
             const callbackUri = await vscode.env.asExternalUri(
                 vscode.Uri.parse(`${vscode.env.uriScheme}://${EXTENSION_ID}/${AUTH_CALLBACK_PATH}`)
             );
-            console.log('Callback URI:', callbackUri.toString(true)); // This will now be vscode://yashaswinimj1319.ai-seo-agent-vscode/...
+            console.log('Callback URI:', callbackUri.toString(true));
 
             const loginUrl = new URL('/auth/vscode-login', getWebAppBaseUrl());
             loginUrl.searchParams.set('callback', callbackUri.toString(true));
@@ -142,16 +147,21 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
 
             await TokenManager.instance.setToken(token);
             const session = this.createSessionHelper(token, "Logged In User (New)");
+
             sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
             vscode.window.showInformationMessage('Successfully logged in via browser!');
             return session;
 
         } catch (err: any) {
             console.error('Error during createSession:', err);
-            vscode.window.showErrorMessage(`Login failed: ${err.message || 'An unexpected error occurred.'}`);
+            if (err.message !== 'Login cancelled by user.') {
+                vscode.window.showErrorMessage(`Login failed: ${err.message || 'An unexpected error occurred.'}`);
+            }
             await TokenManager.instance.deleteToken();
             const existingSessions = await this.getSessions();
-            sessionChangeEmitter.fire({ added: [], removed: existingSessions, changed: [] });
+            if (existingSessions.length > 0) {
+                sessionChangeEmitter.fire({ added: [], removed: existingSessions, changed: [] });
+            }
             throw err;
         }
     }
@@ -159,7 +169,8 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
     public async removeSession(sessionId: string): Promise<void> {
         console.log(`AuthProvider: removeSession called for ID: ${sessionId}`);
         const currentToken = await TokenManager.instance.getToken();
-        if (currentToken === sessionId || !sessionId) {
+
+        if (!sessionId || currentToken === sessionId) {
             const existingSessions = await this.getSessions();
             if (existingSessions.length > 0) {
                  await TokenManager.instance.deleteToken();
@@ -174,42 +185,81 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         }
     }
 
+    // --- RESTORED handleUri with path fix ---
     public async handleUri(uri: vscode.Uri): Promise<void> {
-        // This log should finally appear!
-        console.log(`AuthProvider: handleUri called with: ${uri.toString(true)}`);
+        console.log(`AuthProvider: handleUri ENTERED with: ${uri.toString(true)}`);
 
-        // Check against the *correct* full extension ID
-        if (uri.authority !== EXTENSION_ID || uri.path !== `/${AUTH_CALLBACK_PATH}`) {
-             console.warn(`handleUri received unexpected authority/path: ${uri.authority}${uri.path}`);
-             return;
+        // Extract the pathname *without* the query string
+        const pathName = uri.path.split('?')[0];
+
+        // Compare only the pathname
+        if (pathName !== `/${AUTH_CALLBACK_PATH}`) {
+             console.warn(`handleUri received unexpected path: ${pathName} (full path: ${uri.path})`);
+             return; // Ignore URIs not matching the expected callback path
+        }
+
+        // Authority check (optional but good practice)
+        if (uri.authority !== EXTENSION_ID) {
+            console.warn(`handleUri received unexpected authority: ${uri.authority}, expected ${EXTENSION_ID}`);
+            // return; // Decide if you want to be strict here
         }
 
         try {
+            // Parse the query parameters from the URI
             const query = new URLSearchParams(uri.query);
             const token = query.get('token');
             const error = query.get('error');
-            const nonce = query.get('nonce');
+            const nonce = query.get('nonce'); // Retrieve the state parameter
 
+            console.log(`handleUri: Parsed Query - Token: ${token ? 'Present' : 'Missing'}, Error: ${error || 'None'}, Nonce: ${nonce || 'Missing'}`);
+
+            // Nonce is crucial
             if (!nonce) {
-                console.error('Callback URI missing nonce.');
-                this.resolveOrRejectPending('unknown_nonce', undefined, new Error('Authentication response missing state parameter.'));
+                console.error('Callback URI missing nonce parameter.');
+                this.resolveOrRejectPending('unknown_nonce', undefined, new Error('Authentication response missing state (nonce) parameter.'));
+                vscode.window.showErrorMessage('Authentication failed: Invalid response from server (missing state).');
                 return;
             }
 
-            if (token) {
-                console.log(`Callback URI contains token for nonce: ${nonce}`);
-                this.resolveOrRejectPending(nonce, token, undefined);
-            } else {
-                const errorMessage = error || 'Unknown error during authentication.';
-                console.error(`Callback URI contains error for nonce ${nonce}: ${errorMessage}`);
-                 this.resolveOrRejectPending(nonce, undefined, new Error(errorMessage));
+            const promiseCallbacks = this._callbackPromises.get(nonce);
+
+            if (!promiseCallbacks) {
+                console.warn(`No pending login found for nonce: ${nonce}. Might have timed out, been cancelled, or already resolved.`);
+                if(error) {
+                    vscode.window.showErrorMessage(`Authentication Error: ${error}`);
+                }
+                return; // No matching pending request
             }
+
+            // Handle success (token received)
+            if (token) {
+                console.log(`Callback URI contains token for nonce: ${nonce}. Resolving promise.`);
+                promiseCallbacks.resolve(token); // Resolve the promise in createSession
+            }
+            // Handle error from the server
+            else {
+                const errorMessage = error || 'Unknown error during authentication.';
+                console.error(`Callback URI contains error for nonce ${nonce}: ${errorMessage}. Rejecting promise.`);
+                promiseCallbacks.reject(new Error(errorMessage)); // Reject the promise
+            }
+
+            // Clean up the promise map for this nonce
+            this._callbackPromises.delete(nonce);
+
         } catch (err: any) {
-            console.error('Error parsing callback URI:', err);
-             this.rejectAnyPending(`Failed to process authentication response: ${err.message}`);
+            console.error('Error processing callback URI:', err);
+            // Reject ALL pending promises if URI parsing fails
+            const genericError = new Error(`Failed to process authentication response: ${err.message}`);
+             this._callbackPromises.forEach((callbacks) => {
+                callbacks.reject(genericError);
+             });
+             this._callbackPromises.clear();
+             vscode.window.showErrorMessage(genericError.message);
         }
     }
+    // --- END RESTORED handleUri ---
 
+    // Helper to resolve or reject the correct pending promise based on nonce
     private resolveOrRejectPending(nonce: string, token: string | undefined, error: Error | undefined): void {
         const promiseCallbacks = this._callbackPromises.get(nonce);
         if (promiseCallbacks) {
@@ -225,14 +275,8 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         }
     }
 
-    private rejectAnyPending(errorMessage: string): void {
-        const error = new Error(errorMessage);
-        this._callbackPromises.forEach((callbacks) => {
-            callbacks.reject(error);
-        });
-        this._callbackPromises.clear();
-    }
 
+    // Helper function to create the session object structure VS Code expects
     private createSessionHelper(token: string, userLabel: string): vscode.AuthenticationSession {
         return {
             id: token,
@@ -242,14 +286,15 @@ export class AISEOAuthProvider implements vscode.AuthenticationProvider, vscode.
         };
     }
 
+    // Dispose method to clean up resources
     public dispose() {
-        this._disposable.dispose();
+        // URI Handler disposable is managed in extension.ts
          this._callbackPromises.forEach((callbacks, nonce) => {
              callbacks.reject(new Error('Authentication provider disposed.'));
              console.log(`Rejected pending auth for nonce ${nonce} due to disposal.`);
          });
-        this._callbackPromises.clear();
+        this._callbackPromises.clear(); // Clear the map
         console.log('AISEOAuthProvider disposed.');
     }
 }
-
+// --- END OF SINGLE CLASS DEFINITION ---
