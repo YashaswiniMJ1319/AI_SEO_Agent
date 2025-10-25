@@ -33,7 +33,7 @@ const handleLogin = async (e: React.FormEvent) => {
     console.log("Sending login payload:", payload);
 
     if (isVSCodeFlow) {
-      // Submit via real form so 302->vscode:// redirect works
+      // 🟢 Create a real form POST so 302 → vscode:// redirect works
       const form = document.createElement("form");
       form.method = "POST";
       form.action = `${axiosClient.defaults.baseURL}/auth/login`;
@@ -47,11 +47,16 @@ const handleLogin = async (e: React.FormEvent) => {
       });
 
       document.body.appendChild(form);
-      form.submit();
-      return; // stop here, browser will handle redirect
+
+      // Small delay to let user see “Redirecting...” message
+      setTimeout(() => {
+        form.submit();
+      }, 700);
+
+      return; // Stop execution; redirect handled by backend
     }
 
-    // Standard web login flow
+    // 🌐 Standard web login flow
     const res = await axiosClient.post("/auth/login", payload);
     console.log("✅ Login response:", res);
     localStorage.setItem("token", res.data.token);
@@ -111,17 +116,26 @@ const handleLogin = async (e: React.FormEvent) => {
             </button>
           </div>
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full text-white py-2 px-4 rounded-lg transition duration-150 ease-in-out font-medium ${
-              loading
-                ? 'bg-indigo-300 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-            }`}
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
+         {/* Submit Button */}
+<button
+  type="submit"
+  disabled={loading}
+  className={`w-full py-2 mt-2 rounded-md text-white font-medium transition duration-150 ease-in-out ${
+    loading
+      ? "bg-blue-300 cursor-not-allowed"
+      : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+  }`}
+>
+  {loading && isVSCodeFlow ? "Redirecting..." : loading ? "Logging in..." : "Login"}
+</button>
+
+{/* Redirecting Message (only for VS Code flow) */}
+{loading && isVSCodeFlow && (
+  <div className="text-blue-600 text-center mt-4 animate-pulse">
+    Redirecting to VS Code...
+  </div>
+)}
+
         </form>
         {!isVSCodeFlow && (
           <p className="text-center text-sm text-gray-600 mt-4">
