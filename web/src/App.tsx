@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import VSCodeLoginPage from "./pages/auth/VSCodeLoginPage.tsx";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -17,7 +18,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
+        <Route path="/auth/vscode-login" element={<VSCodeLoginPage />} />
         {/* Protected route example */}
         <Route
           path="/dashboard"
