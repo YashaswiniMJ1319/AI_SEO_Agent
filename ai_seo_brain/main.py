@@ -73,14 +73,12 @@ class TokenData(BaseModel):
 ai_model = genai.GenerativeModel('models/gemini-flash-latest')
 
 def get_page_text(soup: BeautifulSoup) -> str:
-    """Helper function to extract clean text from HTML."""
     for script_or_style in soup(["script", "style"]):
         script_or_style.decompose()
     text = soup.get_text(separator=' ', strip=True)
     return re.sub(r'\s+', ' ', text)
 
 async def generate_meta_description(page_text: str) -> str | None:
-    """Uses the Gemini API to generate a meta description."""
     prompt = f"""
     You are an expert SEO copywriter.
     Based on the following webpage text, write a compelling meta description.
@@ -110,10 +108,8 @@ async def generate_alt_text(image_src: str, page_text: str) -> str | None:
     prompt = f"""
     You are an expert SEO copywriter. Generate a concise, descriptive alt text for an image.
     The image's filename is: "{filename_hint}"
-    This filename is a strong hint.
     The surrounding page text is: "{page_text[:1500]}"
-    Use both filename and page text to infer the image's content.
-    Respond with ONLY the descriptive alt text (e.g., "A red car driving on a highway").
+    Respond with ONLY the descriptive alt text.
     """
 
     try:
@@ -333,13 +329,7 @@ async def analyze_seo(request: SeoRequest, current_user: TokenData = Depends(get
 
     # --- Return the final report ---
     final_score = max(0, seo_score)
-
-    return SeoResponse(
-        seoScore=final_score,
-        issues=issues,
-        suggestions=suggestions,
-        keywordAnalysis=keyword_report
-    )
+    return SeoResponse(seoScore=final_score, issues=issues, suggestions=suggestions, keywordAnalysis=keyword_report)
 
 # Run the server (optional health check endpoint)
 @app.get("/health")

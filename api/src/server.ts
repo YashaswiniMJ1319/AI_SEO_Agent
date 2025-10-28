@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes";
+import aiRoutes from "./routes/aiRoutes";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(express.json());
 // Parse URL-encoded bodies (for HTML form POST)
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authRoutes);
+app.use("/api", aiRoutes);
 
 app.get("/api/health", (_, res) =>
   res.json({ status: "ok", message: "Backend is running 🚀" })
