@@ -1,33 +1,31 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { Eye, EyeOff } from "lucide-react";
 
-const Register: React.FC = () => {
-  const navigate = useNavigate();
+export interface RegisterProps {
+  onSuccess?: () => void;
+  onSwitchToLogin?: () => void;
+}
+
+const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
     password: "",
   });
+
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    password: "",
-    general: "",
-  });
+  const [errors, setErrors] = useState({ general: "", phone: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordRules, setShowPasswordRules] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     level: "",
     color: "",
     percent: 0,
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordRules, setShowPasswordRules] = useState(false);
 
-  // 🔹 Password strength checker
+  // ✅ Password strength checker
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
     if (password.length >= 8) strength++;
@@ -45,64 +43,65 @@ const Register: React.FC = () => {
     return { level: "", color: "", percent: 0 };
   };
 
-  // 🔹 Handle input change
+  // ✅ Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    if (name === "phone" && !/^\d*$/.test(value)) return;
+    // 🔹 Restrict phone input to numbers only
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) return; // Block non-numeric input
+      if (value.length > 10) {
+        setErrors({ ...errors, phone: "Phone number cannot exceed 10 digits." });
+        return;
+      } else {
+        setErrors({ ...errors, phone: "" });
+      }
+    }
 
-    setFormData({ ...formData, [name]: value });
-    setErrors({ ...errors, [name]: "", general: "" });
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "password") {
       setPasswordStrength(checkPasswordStrength(value));
     }
   };
 
-  // 🔹 Validate form
-  const validateForm = () => {
-    const newErrors: any = {};
-    const { fullName, email, phone, password } = formData;
-
-    if (!fullName.trim()) newErrors.fullName = "Full name is required.";
-
-    if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email)) {
-      newErrors.email = "Please enter a valid Gmail address.";
-    }
-
-    if (!/^\d{10}$/.test(phone)) {
-      newErrors.phone = "Phone number must be exactly 10 digits.";
-    }
-
-    const strongPassword =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!strongPassword.test(password)) {
-      newErrors.password =
-        "Password must be 8+ chars with uppercase, lowercase, number, and special character.";
-    }
-
-    setErrors((prev) => ({ ...prev, ...newErrors }));
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // 🔹 Submit handler
+  // ✅ Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors({ ...errors, general: "" });
-
-    if (!validateForm()) return;
-
     setLoading(true);
-    try {
-      const res = await axiosClient.post("/auth/register", formData);
-      console.log("✅ Register response:", res.data);
-      alert("Registration successful!");
-      navigate("/login");
-    } catch (err: any) {
-      console.error("❌ Registration error:", err);
+    setErrors({ general: "", phone: "" });
+
+    // 🔹 Phone number validation
+    if (formData.phone.length !== 10) {
+      setErrors({ ...errors, phone: "Phone number must be exactly 10 digits." });
+      alert("⚠️ Phone number must be exactly 10 digits.");
+      setLoading(false);
+      return;
+    }
+
+    // 🔹 Password validation
+    const strongPassword =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!strongPassword.test(formData.password)) {
       setErrors({
         ...errors,
-        general: err.response?.data?.message || "Something went wrong",
+        general:
+          "Password must be at least 8 chars, include uppercase, lowercase, number & special char.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await axiosClient.post("/auth/register", formData);
+      alert("🎉 Registration successful! Please log in.");
+      onSuccess?.();
+      onSwitchToLogin?.();
+    } catch (error: any) {
+      setErrors({
+        ...errors,
+        general:
+          error.response?.data?.message || "Something went wrong. Try again.",
       });
     } finally {
       setLoading(false);
@@ -110,145 +109,131 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-50">
-      <div className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center mb-6">Create Account</h2>
+    <div className="text-white">
+      <h2 className="text-2xl font-bold text-center mb-6">Create Account</h2>
 
-        {errors.general && (
-          <div className="text-red-500 text-center mb-3">{errors.general}</div>
-        )}
+      {errors.general && (
+        <div className="text-red-400 text-center mb-3">{errors.general}</div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name */}
-          <div>
-            <input
-              type="text"
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Full Name"
-              className="w-full border rounded-lg px-3 py-2"
-            />
-            {errors.fullName && (
-              <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
-            )}
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Full Name */}
+        <input
+          type="text"
+          name="fullName"
+          value={formData.fullName}
+          onChange={handleChange}
+          placeholder="Full Name"
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
+        />
 
-          {/* Email */}
-          <div>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Email"
-              className="w-full border rounded-lg px-3 py-2"
-            />
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
+        {/* Email */}
+        <input
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="Email (Gmail only)"
+          className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
+        />
 
-          {/* Phone */}
-          <div>
-            <input
-              type="text"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Phone"
-              maxLength={10}
-              className="w-full border rounded-lg px-3 py-2"
-            />
-            {errors.phone && (
-              <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-            )}
-          </div>
+        {/* Phone */}
+        <div>
+          <input
+            type="text"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="Phone (10 digits)"
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2"
+          />
+          {errors.phone && (
+            <p className="text-red-400 text-sm mt-1">{errors.phone}</p>
+          )}
+        </div>
 
-          {/* Password */}
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              onFocus={() => setShowPasswordRules(true)}
-              onBlur={() => setShowPasswordRules(false)}
-              placeholder="Password"
-              className="w-full border rounded-lg px-3 py-2 pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-
-            {/* Password strength bar */}
-            {formData.password && (
-              <div className="mt-2">
-                <div className="w-full bg-gray-200 h-2 rounded-full">
-                  <div
-                    className={`h-2 rounded-full ${passwordStrength.color}`}
-                    style={{ width: `${passwordStrength.percent}%` }}
-                  ></div>
-                </div>
-                <p
-                  className={`text-sm mt-1 ${
-                    passwordStrength.level === "Weak"
-                      ? "text-red-500"
-                      : passwordStrength.level === "Medium"
-                      ? "text-yellow-600"
-                      : "text-green-600"
-                  }`}
-                >
-                  {passwordStrength.level} password
-                </p>
-              </div>
-            )}
-
-            {/* Password rule message */}
-            {showPasswordRules && (
-              <div className="mt-2 text-xs text-gray-600 bg-gray-100 border border-gray-200 rounded-md p-2">
-                <p className="font-medium text-gray-700 mb-1">
-                  Password must contain:
-                </p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  <li>At least 8 characters</li>
-                  <li>One uppercase letter</li>
-                  <li>One lowercase letter</li>
-                  <li>One number</li>
-                  <li>One special character (@$!%*?&)</li>
-                </ul>
-              </div>
-            )}
-
-            {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-            )}
-          </div>
-
-          {/* Submit */}
+        {/* Password */}
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            onFocus={() => setShowPasswordRules(true)}
+            onBlur={() => setShowPasswordRules(false)}
+            placeholder="Password"
+            className="w-full bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 pr-10"
+          />
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition"
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
           >
-            {loading ? "Registering..." : "Register"}
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
-        </form>
 
-        <p className="text-center text-sm mt-4">
-          Already have an account?{" "}
-          <Link to="/login" className="text-indigo-600 hover:underline">
-            Login
-          </Link>
-        </p>
-      </div>
+          {/* Password Strength Bar */}
+          {formData.password && (
+            <div className="mt-2">
+              <div className="w-full bg-white/10 h-2 rounded-full">
+                <div
+                  className={`h-2 rounded-full ${passwordStrength.color} transition-all duration-500`}
+                  style={{ width: `${passwordStrength.percent}%` }}
+                ></div>
+              </div>
+              <p
+                className={`text-sm mt-1 ${
+                  passwordStrength.level === "Weak"
+                    ? "text-red-400"
+                    : passwordStrength.level === "Medium"
+                    ? "text-yellow-400"
+                    : "text-green-400"
+                }`}
+              >
+                {passwordStrength.level} password
+              </p>
+            </div>
+          )}
+
+          {/* Password Rules */}
+          {showPasswordRules && (
+            <div className="mt-2 text-xs text-gray-300 bg-white/10 border border-white/20 rounded-md p-2">
+              <p className="font-medium text-gray-200 mb-1">
+                Password must contain:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-gray-400">
+                <li>At least 8 characters</li>
+                <li>One uppercase letter</li>
+                <li>One lowercase letter</li>
+                <li>One number</li>
+                <li>One special character (@$!%*?&)</li>
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition-all shadow-lg hover:shadow-blue-500/50"
+        >
+          {loading ? "Registering..." : "Register"}
+        </button>
+      </form>
+
+      {/* Switch to Login */}
+      <p className="text-center text-sm mt-4 text-gray-300">
+        Already have an account?{" "}
+        <button
+          onClick={onSwitchToLogin}
+          className="text-indigo-400 hover:underline"
+        >
+          Login
+        </button>
+      </p>
     </div>
   );
 };
 
 export default Register;
-
