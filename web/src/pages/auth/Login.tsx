@@ -1,108 +1,189 @@
-// File: src/pages/auth/Login.tsx
+// File: web/src/pages/auth/Login.tsx
 
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient.ts";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { motion, useMotionValue, useTransform } from "framer-motion";
+import Lottie from "lottie-react";
+import aiBackground from "../../assets/ai-animation.json";
 
 interface LoginProps {
   vscodeCallbackUri?: string | null;
   vscodeNonce?: string | null;
+  onSuccess?: () => void;
+  onSwitchToRegister?: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ vscodeCallbackUri, vscodeNonce }) => {
+const Login: React.FC<LoginProps> = ({
+  vscodeCallbackUri,
+  vscodeNonce,
+  onSuccess,
+  onSwitchToRegister,
+}) => {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ username: "", password: "" });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const isVSCodeLogin = !!vscodeCallbackUri; // Detect VSCode login mode
+  const isVSCodeFlow = !!(vscodeCallbackUri && vscodeNonce);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // === Keep your exact logic ===
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
 
     try {
-      const res = await axiosClient.post("/login", formData);
-      if (res.status === 200) {
-        if (isVSCodeLogin) {
-          window.location.href = `${vscodeCallbackUri}?nonce=${vscodeNonce}&token=${res.data.token}`;
-        } else {
-          navigate("/dashboard");
-        }
+      const payload = {
+        email,
+        password,
+        ...(isVSCodeFlow && { callback: vscodeCallbackUri, nonce: vscodeNonce }),
+      };
+
+      console.log("Sending login payload:", payload);
+
+      if (isVSCodeFlow) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = `${axiosClient.defaults.baseURL}/auth/login`;
+
+        Object.entries(payload).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = value as string;
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        setTimeout(() => form.submit(), 700);
+        return;
       }
-    } catch (err) {
+
+      const res = await axiosClient.post("/auth/login", payload);
+      localStorage.setItem("token", res.data.token);
+      alert("Login successful!");
+      onSuccess?.();
+      navigate("/");
+    } catch (err: any) {
       console.error("Login failed:", err);
+      setError(err.response?.data?.message || err.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
+  // === Framer-motion background setup ===
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-100, 100], [15, -15]);
+  const rotateY = useTransform(x, [-100, 100], [-15, 15]);
+
   return (
-    <div
-      className={`relative z-10 flex flex-col justify-center items-center min-h-[400px] rounded-3xl p-8 w-full
-        ${isVSCodeLogin
-          ? "bg-transparent backdrop-blur-2xl border border-white/20 shadow-[0_0_25px_rgba(150,150,255,0.2)]"
-          : "bg-white/10 backdrop-blur-xl border border-white/30 shadow-lg"
-        }`}
-    >
-      <h2 className="text-2xl font-semibold mb-6 text-indigo-300">
-        {isVSCodeLogin ? "Login to Continue" : "Welcome Back"}
-      </h2>
+    <div className="relative flex items-center justify-center min-h-screen overflow-hidden bg-gradient-to-br from-[#030014] via-[#080826] to-black text-white">
+      {/* 🌌 Animated Background */}
+      <motion.div
+        style={{ rotateX, rotateY }}
+        className="fixed inset-0 z-0 flex items-center justify-center pointer-events-none"
+        animate={{ scale: [1, 1.03, 1] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Lottie
+          animationData={aiBackground}
+          loop
+          autoplay
+          className="w-[600px] h-[500px] md:w-[800px] md:h-[600px] opacity-25 md:opacity-30"
+        />
+      </motion.div>
 
-      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
-        <div>
-          <label className="block text-gray-300 mb-2 text-sm">Username</label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 rounded-lg bg-white/10 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-        </div>
+      {/* 🪩 Glassmorphic Login Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1 }}
+        className="relative z-10 w-[95%] max-w-md rounded-3xl bg-white/10 backdrop-blur-2xl p-10 border border-white/20 shadow-[0_0_40px_rgba(150,150,255,0.15)]"
+      >
+        <h3 className="text-2xl font-semibold mb-6 text-center text-indigo-300">
+          {isVSCodeFlow ? "VS Code Authentication" : "Welcome Back"}
+        </h3>
 
-        <div className="relative">
-          <label className="block text-gray-300 mb-2 text-sm">Password</label>
-          <input
-            type={showPassword ? "text" : "password"}
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 rounded-lg bg-white/10 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
+        {error && (
+          <p className="text-sm text-center text-red-400 mb-4">{error}</p>
+        )}
+
+        <form onSubmit={handleLogin} className="space-y-6">
+          {/* Email */}
+          <div>
+            <label className="block text-sm mb-2 text-gray-300">Email</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              className="w-full px-4 py-3 rounded-lg bg-white/10 text-gray-100 border border-white/20 focus:border-indigo-400 outline-none placeholder-gray-400"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* Password */}
+          <div className="relative">
+            <label className="block text-sm mb-2 text-gray-300">Password</label>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              className="w-full px-4 py-3 pr-10 rounded-lg bg-white/10 text-gray-100 border border-white/20 focus:border-indigo-400 outline-none placeholder-gray-400"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-[42px] text-gray-400 hover:text-indigo-300"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+
+          {/* Submit */}
           <button
-            type="button"
-            className="absolute right-3 top-[38px] text-gray-400"
-            onClick={() => setShowPassword(!showPassword)}
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 mt-4 rounded-lg font-semibold flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md shadow-indigo-900/30"
           >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin mr-2" size={20} />
+                {isVSCodeFlow ? "Redirecting..." : "Logging in..."}
+              </>
+            ) : (
+              "Login"
+            )}
           </button>
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg transition disabled:opacity-50"
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          {/* Redirecting Message */}
+          {loading && isVSCodeFlow && (
+            <div className="text-blue-400 text-center mt-4 animate-pulse">
+              Redirecting to VS Code...
+            </div>
+          )}
+        </form>
 
-      {!isVSCodeLogin && (
-        <p className="text-gray-400 text-sm mt-4">
-          Don’t have an account?{" "}
-          <Link to="/register" className="text-indigo-400 hover:underline">
-            Register
-          </Link>
-        </p>
-      )}
+        {!isVSCodeFlow && (
+          <p className="mt-6 text-center text-gray-300 text-sm">
+            Don’t have an account?{" "}
+            <button
+              onClick={onSwitchToRegister}
+              className="text-indigo-400 hover:underline hover:text-indigo-300 transition"
+            >
+              Register
+            </button>
+          </p>
+        )}
+      </motion.div>
     </div>
   );
 };
