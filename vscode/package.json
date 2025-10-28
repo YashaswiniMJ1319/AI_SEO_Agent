@@ -16,10 +16,30 @@
     "onCommand:ai-seo-agent-vscode.logout",
     "onCommand:ai-seo-agent-vscode.analyzeFile",
     "onAuthenticationRequest:ai-seo-agent-auth",
-    "onUri"
+    "onUri",
+    "onView:aiSeoAgentView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-seo-agent-sidebar",
+          "title": "AI SEO Agent",
+          "icon": "$(zap)" 
+        }
+      ]
+    },
+    "views": {
+      "ai-seo-agent-sidebar": [ 
+        {
+          "id": "aiSeoAgentView",
+          "name": "SEO Analysis",
+          "type": "webview", 
+          "contextualTitle": "AI SEO Agent"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "ai-seo-agent-vscode.login",
@@ -30,12 +50,8 @@
         "command": "ai-seo-agent-vscode.logout",
         "title": "AI SEO Agent: Logout",
         "category": "AI SEO Agent"
-      },
-      {
-        "command": "ai-seo-agent-vscode.analyzeFile",
-        "title": "AI SEO Agent: Analyze Current File",
-        "category": "AI SEO Agent"
       }
+    
     ],
     "authentication": [
       {
