@@ -5,11 +5,11 @@ const router = express.Router();
 
 router.post("/seo/analyze", async (req, res) => {
   try {
-    const response = await axios.post(
-      process.env.AI_SERVICE_URL || "http://localhost:8000/analyze",
-      req.body, // content, contentType, config
-      { timeout: 20000 }
-    );
+   const response = await axios.post(
+  process.env.AI_SERVICE_URL || "http://ai_seo_brain:8000/analyze", // <-- CORRECTED URL
+  req.body,
+  { timeout: 20000 }
+);
 
     res.json(response.data);
   } catch (error: any) {

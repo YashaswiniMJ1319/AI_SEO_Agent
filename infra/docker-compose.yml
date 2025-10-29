@@ -1,17 +1,6 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    environment:
-      POSTGRES_USER: devuser
-      POSTGRES_PASSWORD: devpass
-      POSTGRES_DB: appdb
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
 
   api:
     container_name: api
@@ -20,7 +9,6 @@ services:
       dockerfile: ../infra/docker/api.Dockerfile
     command: npm run dev
     depends_on:
-      - postgres
       - ai_seo_brain
     env_file:
       - ../api/.env     # ✅ point to backend’s .env file
@@ -43,19 +31,16 @@ services:
     volumes:
       - ../ai_seo_brain:/app
 
-  web:
-    container_name: web
-    build:
-      context: ../web
-      dockerfile: ../infra/docker/web.Dockerfile
-    command: npm run dev -- --host
-    depends_on:
-      - api
-    ports:
-      - "5173:5173"
-    volumes:
-      - ../web:/usr/src/app
-      - /usr/src/app/node_modules
-
-volumes:
-  pgdata:
+  #web:
+  #  container_name: web
+   # build:
+   #   context: ../web
+  #    dockerfile: ../infra/docker/web.Dockerfile
+  #  command: npm run dev -- --host
+  #  depends_on:
+  #    - api
+  #  ports:
+  #    - "5173:5173"
+  #  volumes:
+  #    - ../web:/usr/src/app
+  #    - /usr/src/app/node_modules

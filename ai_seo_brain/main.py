@@ -1,51 +1,45 @@
 import uvicorn
 import os
-from fastapi import FastAPI, Depends, HTTPException, status # Added Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # Added security imports
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from bs4 import BeautifulSoup, Tag
 import google.generativeai as genai
 from dotenv import load_dotenv
 import re
-from typing import Optional # Import Optional
-
-# --- Add JWT imports ---
+from typing import Optional
 from jose import JWTError, jwt
-# -----------------------
 
 # --- Load environment variables ---
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
-# --- Get JWT Secret (MUST match the one in Node.js API) ---
-JWT_SECRET = os.getenv("JWT_SECRET") or "super_secret_jwt_key" # Use the same default or set in .env
-ALGORITHM = "HS256" # Algorithm used by Node.js API
-# -----------------------------------------------------------
+JWT_SECRET = os.getenv("JWT_SECRET") or "super_secret_jwt_key"
+ALGORITHM = "HS256"
 
 if not GEMINI_API_KEY:
-    print("Error: GOOGLE_API_KEY not found. Please check your .env file.")
-# else: # Keep genai configured even if JWT_SECRET is missing initially
-genai.configure(api_key=GEMINI_API_KEY)
+    print("❌ Error: GOOGLE_API_KEY not found in .env")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
+
 if not JWT_SECRET or JWT_SECRET == "super_secret_jwt_key":
-     print("Warning: JWT_SECRET is using the default value or is not set in .env. Ensure this matches the Node.js API's secret.")
+    print("⚠️ Warning: Using default JWT secret. Set JWT_SECRET in .env")
 
-
-# --- MODULE 1: API Models ---
-
+# --- Models ---
 class SeoRequest(BaseModel):
     content: str
     contentType: str
-    config: Optional[dict] = {} # Make config optional
+    config: Optional[dict] = {}
 
 class Issue(BaseModel):
     type: str
     message: str
-    line: Optional[int] = None # Use Optional
+    line: Optional[int] = None
 
 class Suggestion(BaseModel):
     type: str
     message: str
     content: str
-    context: Optional[str] = None # Use Optional
+    context: Optional[str] = None
 
 class KeywordAnalysis(BaseModel):
     targetKeyword: str
@@ -59,81 +53,67 @@ class SeoResponse(BaseModel):
     seoScore: int
     issues: list[Issue]
     suggestions: list[Suggestion]
-    keywordAnalysis: Optional[KeywordAnalysis] = None # Use Optional
+    keywordAnalysis: Optional[KeywordAnalysis] = None
 
-# --- Add Token Payload Model ---
 class TokenData(BaseModel):
     userId: Optional[str] = None
     email: Optional[str] = None
-# -----------------------------
 
-# --- MODULE 3: AI Engine ---
-# ... (get_page_text, generate_meta_description, generate_alt_text remain the same) ...
-# --- Assuming these functions exist as before ---
+# --- AI Engine ---
 ai_model = genai.GenerativeModel('models/gemini-flash-latest')
 
 def get_page_text(soup: BeautifulSoup) -> str:
-    for script_or_style in soup(["script", "style"]):
-        script_or_style.decompose()
+    for tag in soup(["script", "style"]):
+        tag.decompose()
     text = soup.get_text(separator=' ', strip=True)
     return re.sub(r'\s+', ' ', text)
 
-async def generate_meta_description(page_text: str) -> str | None:
+async def generate_meta_description(page_text: str) -> Optional[str]:
     prompt = f"""
     You are an expert SEO copywriter.
-    Based on the following webpage text, write a compelling meta description.
-    The meta description must be under 160 characters.
+    Based on the following webpage text, write a compelling meta description under 160 characters.
     It must be in active voice and encourage clicks.
-    Respond with ONLY the meta description and no other text.
+    Respond with ONLY the meta description.
 
     Webpage Text:
     "{page_text[:2000]}"
     """
     try:
-        # Note: Make sure your genai library version supports async properly
-        # If not, remove 'async' and 'await' and use the synchronous call
         response = await ai_model.generate_content_async(prompt)
-        ai_content = response.text.strip().strip('"')
-        return ai_content
+        return response.text.strip().strip('"')
     except Exception as e:
-        print(f"Error calling Gemini API (meta): {e}")
+        print(f"Error (meta): {e}")
         return None
 
-async def generate_alt_text(image_src: str, page_text: str) -> str | None:
-    """Uses the Gemini API to generate alt text for an image."""
-
+async def generate_alt_text(image_src: str, page_text: str) -> Optional[str]:
     filename = image_src.split('/')[-1].split('?')[0]
     filename_hint = filename.replace('-', ' ').replace('_', ' ').rsplit('.', 1)[0]
 
     prompt = f"""
-    You are an expert SEO copywriter. Generate a concise, descriptive alt text for an image.
+    You are an expert SEO copywriter and image optimization specialist.
+    Generate a concise, keyword-rich, and descriptive alt text for the given image.
+
+    Focus on clarity, accessibility, and SEO best practices — as if optimizing for Google Image Search.
+    Avoid generic phrases like "image of" or "picture of". Describe the image naturally using context-relevant keywords.
+
     The image's filename is: "{filename_hint}"
-    The surrounding page text is: "{page_text[:1500]}"
-    Respond with ONLY the descriptive alt text.
+    The surrounding page text (context) is: "{page_text[:1500]}"
+
+    Respond with ONLY the optimized descriptive alt text.
     """
 
     try:
-        # Note: Make sure your genai library version supports async properly
         response = await ai_model.generate_content_async(prompt)
-        ai_content = response.text.strip().strip('"')
-        return ai_content
+        return response.text.strip().strip('"')
     except Exception as e:
-        print(f"Error calling Gemini API (alt text): {e}")
+        print(f"Error (alt text): {e}")
         return None
-# --- End AI Engine ---
 
-
-# --- MODULE 4: Keyword Engine ---
-# ... (perform_keyword_analysis remains the same) ...
-def perform_keyword_analysis(
-    target_keyword: str,
-    page_text: str,
-    title_tag: Optional[Tag], # Use Optional
-    meta_tag: Optional[Tag],  # Use Optional
-    h1_tags: list[Tag]
-) -> KeywordAnalysis:
-    """Runs a full keyword analysis on the page content."""
-
+# --- Keyword Engine ---
+def perform_keyword_analysis(target_keyword: str, page_text: str,
+                             title_tag: Optional[Tag],
+                             meta_tag: Optional[Tag],
+                             h1_tags: list[Tag]) -> KeywordAnalysis:
     keyword_lower = target_keyword.lower()
     text_lower = page_text.lower()
 
@@ -157,19 +137,11 @@ def perform_keyword_analysis(
         bodyCount=body_count,
         density=round(density, 2)
     )
-# --- End Keyword Engine ---
 
-
-# --- Define Security Scheme ---
+# --- JWT Auth ---
 auth_scheme = HTTPBearer()
-# ----------------------------
 
-# --- Define Security Dependency ---
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)) -> TokenData:
-    """
-    Dependency function to validate the Bearer token.
-    Returns the token payload if valid, otherwise raises HTTPException.
-    """
     token = credentials.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -177,165 +149,87 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(a
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode the token using the same secret and algorithm as the Node.js API
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        # --- Extract expected fields (adjust based on Node.js token payload) ---
-        user_id: Optional[str] = payload.get("userId")
-        email: Optional[str] = payload.get("email")
-        if email is None: # Check for at least one identifier
-             print("JWTError: Token payload missing 'email'")
-             raise credentials_exception
-        # -------------------------------------------------------------------
-        token_data = TokenData(userId=user_id, email=email)
-        print(f"Token validated successfully for user: {email or user_id}") # Log success
+        user_id = payload.get("userId")
+        email = payload.get("email")
+        if not email:
+            raise credentials_exception
+        return TokenData(userId=user_id, email=email)
     except JWTError as e:
-        print(f"JWTError: {e}") # Log the specific JWT error
+        print(f"JWTError: {e}")
         raise credentials_exception
-    except Exception as e:
-         print(f"Unexpected error during token decoding: {e}") # Log other errors
-         raise credentials_exception
-    return token_data
-# --------------------------------
 
-# Initialize FastAPI app
+# --- FastAPI App ---
 app = FastAPI()
 
-# --- MODULE 2: Analyzer Endpoint (Now Protected) ---
-
-# --- Add Depends(get_current_user) to protect the endpoint ---
 @app.post("/analyze", response_model=SeoResponse)
-async def analyze_seo(request: SeoRequest, current_user: TokenData = Depends(get_current_user)):
-# -----------------------------------------------------------
-    """
-    Main analysis endpoint. Requires valid Bearer token.
-    Access token payload via `current_user`.
-    """
-    print(f"Received analysis request from user: {current_user.email or current_user.userId}")
-
-    issues: list[Issue] = []
-    suggestions: list[Suggestion] = []
-    keyword_report: Optional[KeywordAnalysis] = None # Use Optional
+async def analyze_seo(request: SeoRequest):
+    
+    issues, suggestions = [], []
     seo_score = 100
+    keyword_report = None
 
     if request.contentType != 'html':
-        # Return valid SeoResponse structure even for errors
-        return SeoResponse(
-            seoScore=0,
-            issues=[Issue(type='error', message='Invalid contentType. Only "html" is supported.')],
-            suggestions=[],
-            keywordAnalysis=None
-        )
+        return SeoResponse(seoScore=0, issues=[Issue(type='error', message='Invalid contentType')], suggestions=[])
 
     try:
         soup = BeautifulSoup(request.content, 'html.parser')
         page_text = get_page_text(soup)
-        # Safely get targetKeyword from potentially missing config
         target_keyword = request.config.get('targetKeyword') if request.config else None
 
-        # --- Run SEO Rules (Same as before) ---
         title_tag = soup.find('title')
-        if not title_tag or not title_tag.string:
-            issues.append(Issue(type='error', message='Missing <title> tag.'))
-            seo_score -= 20
-        elif len(title_tag.string) > 60:
-            issues.append(Issue(type='warning', message='Title is too long. Aim for under 60 characters.'))
-            seo_score -= 5
-
         meta_tag = soup.find('meta', attrs={'name': 'description'})
-        if not meta_tag or not meta_tag.get('content'):
-            issues.append(Issue(type='error', message='Missing <meta name="description"> tag.'))
+        h1_tags = soup.find_all('h1')
+        images = soup.find_all('img')
+
+        # --- Check SEO tags ---
+        if not title_tag:
+            issues.append(Issue(type='error', message='Missing <title> tag'))
             seo_score -= 20
-            print("Meta description missing. Calling AI...")
-            ai_generated_meta = await generate_meta_description(page_text)
-            if ai_generated_meta:
-                suggestions.append(Suggestion(
-                    type='ai_meta',
-                    message='An AI-generated meta description to fix this issue:',
-                    content=ai_generated_meta
-                ))
-        elif len(meta_tag.get('content', '')) > 160:
-            issues.append(Issue(type='warning', message='Meta description is too long. Aim for under 160 characters.'))
+        elif len(title_tag.text) > 60:
+            issues.append(Issue(type='warning', message='Title too long'))
             seo_score -= 5
 
-        h1_tags = soup.find_all('h1')
+        if not meta_tag:
+            issues.append(Issue(type='error', message='Missing <meta description>'))
+            seo_score -= 20
+            ai_meta = await generate_meta_description(page_text)
+            if ai_meta:
+                suggestions.append(Suggestion(type='ai_meta', message='AI-generated meta description:', content=ai_meta))
+        elif len(meta_tag.get('content', '')) > 160:
+            issues.append(Issue(type='warning', message='Meta description too long'))
+            seo_score -= 5
+
         if len(h1_tags) == 0:
-            issues.append(Issue(type='error', message='Missing <h1> tag. Every page needs one main heading.'))
+            issues.append(Issue(type='error', message='Missing <h1> tag'))
             seo_score -= 15
         elif len(h1_tags) > 1:
-            issues.append(Issue(type='warning', message=f'Found {len(h1_tags)} <h1> tags. A page should only have one.'))
+            issues.append(Issue(type='warning', message='Multiple <h1> tags'))
             seo_score -= 10
 
-        images = soup.find_all('img')
+        # --- Check images ---
         for img in images:
-            img_src = img.get('src', 'unknown image')
+            src = img.get('src', '')
             if not img.get('alt'):
-                issues.append(Issue(
-                    type='warning',
-                    message=f"Image is missing alt text. (src: {img_src[:50]}...)"
-                ))
-                seo_score -= 5
-                print(f"Alt text missing for {img_src}. Calling AI...")
-                ai_generated_alt = await generate_alt_text(img_src, page_text)
-                if ai_generated_alt:
-                    suggestions.append(Suggestion(
-                        type='ai_alt_text',
-                        message=f'AI-generated alt text for "{img_src[:50]}...":',
-                        content=ai_generated_alt,
-                        context=img_src
-                    ))
+                issues.append(Issue(type='warning', message=f"Missing alt text for image: {src[:50]}"))
+                ai_alt = await generate_alt_text(src, page_text)
+                if ai_alt:
+                    suggestions.append(Suggestion(type='ai_alt_text', message='AI alt text suggestion:', content=ai_alt, context=src))
 
-        print("Checking heading hierarchy...")
-        headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
-        last_level = 0
-        for h in headings:
-            try:
-                current_level = int(h.name[1])
-                if current_level > last_level + 1:
-                    issues.append(Issue(
-                        type='warning',
-                        message=f"Heading hierarchy skip: <{h.name}> found after <h{last_level}>. Use <h{last_level + 1}> first."
-                    ))
-                    seo_score -= 5
-                last_level = current_level
-            except (IndexError, ValueError):
-                print(f"Warning: Could not parse heading level from tag name: {h.name}")
-        # --- End Rules ---
-
-        # --- Run Keyword Analysis ---
+        # --- Keyword analysis ---
         if target_keyword:
-            print(f"Running keyword analysis for: {target_keyword}")
-            keyword_report = perform_keyword_analysis(
-                target_keyword=target_keyword,
-                page_text=page_text,
-                title_tag=title_tag,
-                meta_tag=meta_tag,
-                h1_tags=h1_tags
-            )
-            if not keyword_report.foundInTitle:
-                issues.append(Issue(type='info', message=f"Target keyword '{target_keyword}' not found in <title>."))
-                seo_score -= 5
-            if not keyword_report.foundInH1:
-                issues.append(Issue(type='info', message=f"Target keyword '{target_keyword}' not found in <h1>."))
-                seo_score -= 5
-        # --- End Keyword Analysis ---
+            keyword_report = perform_keyword_analysis(target_keyword, page_text, title_tag, meta_tag, h1_tags)
 
     except Exception as e:
-         print(f"Error during analysis processing: {e}")
-         # Raise HTTPException for internal errors during analysis
-         raise HTTPException(
-             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-             detail=f"An error occurred during SEO analysis: {e}"
-         )
+        print(f"❌ Error during analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {e}")
 
-    # --- Return the final report ---
-    final_score = max(0, seo_score)
-    return SeoResponse(seoScore=final_score, issues=issues, suggestions=suggestions, keywordAnalysis=keyword_report)
+    return SeoResponse(seoScore=max(0, seo_score), issues=issues, suggestions=suggestions, keywordAnalysis=keyword_report)
 
-# Run the server (optional health check endpoint)
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "ok", "message": "AI SEO Brain is running 🧠"}
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000)) # Allow port configuration via env var
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

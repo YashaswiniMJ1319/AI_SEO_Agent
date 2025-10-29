@@ -1,0 +1,66 @@
+#ai-seo-agent-metabox #ai-seo-controls {
+    margin-bottom: 10px;
+}
+
+#ai-seo-agent-metabox #ai-seo-results h4 {
+    margin-top: 15px;
+    margin-bottom: 5px;
+    font-weight: bold;
+    font-size: 1em; /* Adjust as needed */
+}
+
+#ai-seo-agent-metabox #ai-seo-results ul {
+    margin-top: 0;
+    margin-left: 20px; /* Indent list items */
+    font-size: 0.9em; /* Slightly smaller text */
+    padding-left: 0; /* Remove default padding if margin is used */
+}
+
+#ai-seo-agent-metabox #ai-seo-results li {
+    margin-bottom: 8px;
+    padding: 3px 0;
+}
+
+/* Style different issue types */
+#ai-seo-agent-metabox #ai-seo-issues li.issue-error {
+    color: #dc3232; /* WordPress error color */
+    font-weight: bold;
+}
+
+#ai-seo-agent-metabox #ai-seo-issues li.issue-warning {
+    color: #ffb900; /* WordPress warning color */
+}
+
+#ai-seo-agent-metabox #ai-seo-suggestions li em {
+    display: block;
+    margin-top: 2px;
+    color: #555; /* Darker grey for suggested content */
+    font-style: normal; /* Override italics if needed */
+    background-color: #f9f9f9;
+    padding: 3px 5px;
+    border-radius: 3px;
+    border: 1px solid #eee;
+}
+
+#ai-seo-agent-metabox #ai-seo-suggestions li small {
+    color: #777;
+    font-size: 0.9em;
+    display: block;
+    margin-top: 2px;
+}
+
+#ai-seo-agent-metabox .ai-seo-apply-button {
+   /* Add specific styles for apply button if needed */
+   vertical-align: middle;
+   margin-left: 8px;
+}
+
+#ai-seo-agent-metabox #ai-seo-keyword-details ul {
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+#ai-seo-agent-metabox #ai-seo-keyword-details li {
+    margin-bottom: 4px;
+}

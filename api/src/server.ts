@@ -9,7 +9,8 @@ const app = express();
 const corsOptions = {
   origin: [
     "http://localhost:5173",                 // Frontend (Vite dev)
-    "vscode://yashaswinimj1319.ai-seo-agent-vscode", // VS Code extension
+    "vscode://yashaswinimj1319.ai-seo-agent-vscode", 
+    "http://localhost",// VS Code extension
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
