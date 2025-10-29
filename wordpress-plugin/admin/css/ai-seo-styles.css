@@ -1,66 +1,211 @@
-#ai-seo-agent-metabox #ai-seo-controls {
-    margin-bottom: 10px;
+#ai-seo-agent-wrapper {
+    font-size: 13px; /* Standard WP admin font size */
+    line-height: 1.4;
 }
 
-#ai-seo-agent-metabox #ai-seo-results h4 {
-    margin-top: 15px;
+.ai-seo-section {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e5e5; /* Slightly softer border */
+}
+.ai-seo-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+#ai-seo-controls label {
+    display: block;
+    margin-bottom: 3px;
+    font-weight: 600; /* Slightly bolder */
+    color: #3c434a;
+}
+#ai-seo-controls #ai-seo-analyze-button {
+    margin-top: 5px;
+}
+
+p.status-text {
+    font-style: italic;
+    color: #50575e; /* Standard text color */
+    margin-top: 8px;
+    min-height: 1.5em; /* Prevent layout shift */
+    transition: color 0.3s ease;
+}
+p.status-text.error {
+    color: #dc3232; /* Error color */
+    font-style: normal;
+}
+p.status-text.success {
+    color: #00a32a; /* Success color */
+    font-style: normal;
+}
+
+/* Score Bar */
+#ai-seo-score-section h4 {
     margin-bottom: 5px;
+    font-size: 1.1em;
+    color: #1d2327;
+}
+#ai-seo-score-section h4 #ai-seo-score-value {
     font-weight: bold;
-    font-size: 1em; /* Adjust as needed */
+}
+.score-bar-container {
+    width: 100%;
+    height: 12px;
+    background-color: #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+.score-bar {
+    height: 100%;
+    width: 0%; /* Will be set by JS */
+    border-radius: 6px;
+    transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+    background-color: #dc3232; /* Default Red */
+}
+.score-bar.low { background-color: #dc3232; } /* Red < 50 */
+.score-bar.medium { background-color: #ffb900; } /* Yellow 50-79 */
+.score-bar.high { background-color: #46b450; } /* Green >= 80 */
+
+/* Collapsible Sections */
+.collapsible-trigger {
+    background: none;
+    border: none;
+    padding: 5px 0;
+    width: 100%;
+    text-align: left;
+    font-weight: 600;
+    font-size: 1em;
+    cursor: pointer;
+    color: #2271b1; /* WP Blue */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.collapsible-trigger:hover {
+    color: #135e96;
+}
+.collapsible-content {
+    padding: 10px 0 5px 10px; /* Indent content */
+    border-left: 3px solid #f0f0f1; /* Lighter border */
+    margin-left: 5px;
+    margin-top: 5px;
+}
+.collapsible.closed .collapsible-content {
+    display: none;
+}
+.collapsible .toggle-icon {
+    font-size: 1.2em; /* Make icon slightly larger */
+    line-height: 1;
+    margin-left: 5px;
+    transition: transform 0.2s ease-in-out;
+    color: #787c82; /* Grey icon */
+}
+.collapsible.closed .toggle-icon {
+    transform: rotate(0deg);
+}
+.collapsible.open .toggle-icon {
+    transform: rotate(90deg);
 }
 
-#ai-seo-agent-metabox #ai-seo-results ul {
-    margin-top: 0;
-    margin-left: 20px; /* Indent list items */
-    font-size: 0.9em; /* Slightly smaller text */
-    padding-left: 0; /* Remove default padding if margin is used */
-}
 
-#ai-seo-agent-metabox #ai-seo-results li {
+/* Issues List */
+#ai-seo-issues { list-style: none; margin: 0; padding: 0; }
+#ai-seo-issues li {
     margin-bottom: 8px;
-    padding: 3px 0;
+    padding-left: 22px; /* Space for icon */
+    position: relative;
+    color: #3c434a;
+    line-height: 1.3;
 }
-
-/* Style different issue types */
-#ai-seo-agent-metabox #ai-seo-issues li.issue-error {
-    color: #dc3232; /* WordPress error color */
-    font-weight: bold;
+#ai-seo-issues li::before { /* Use Dashicons */
+    font-family: 'dashicons';
+    position: absolute;
+    left: 0;
+    top: 1px; /* Adjust alignment */
+    font-size: 18px;
 }
+#ai-seo-issues li.issue-error::before { content: '\f158'; color: #dc3232; } /* Error icon (dismiss) */
+#ai-seo-issues li.issue-warning::before { content: '\f534'; color: #ffb900; } /* Warning icon (warning) */
+#ai-seo-issues li.issue-info::before { content: '\f348'; color: #007cba; } /* Info icon (info) */
 
-#ai-seo-agent-metabox #ai-seo-issues li.issue-warning {
-    color: #ffb900; /* WordPress warning color */
+/* Suggestions List */
+#ai-seo-suggestions { list-style: none; margin: 0; padding: 0; }
+#ai-seo-suggestions li.ai-seo-suggestion-item {
+    margin-bottom: 12px;
+    padding: 10px;
+    background-color: #f6f7f7;
+    border-radius: 4px;
+    border: 1px solid #dcdcde;
 }
-
-#ai-seo-agent-metabox #ai-seo-suggestions li em {
+#ai-seo-suggestions .suggestion-content code { /* The suggested text */
     display: block;
-    margin-top: 2px;
-    color: #555; /* Darker grey for suggested content */
-    font-style: normal; /* Override italics if needed */
-    background-color: #f9f9f9;
-    padding: 3px 5px;
+    background-color: #fff;
+    padding: 8px 10px;
     border-radius: 3px;
-    border: 1px solid #eee;
+    font-family: Consolas, Monaco, monospace; /* Monospace font */
+    margin-bottom: 6px;
+    word-break: break-word;
+    border: 1px solid #ccd0d4;
+    color: #1d2327;
+    font-size: 1.05em; /* Slightly larger code */
+    line-height: 1.4;
 }
-
-#ai-seo-agent-metabox #ai-seo-suggestions li small {
-    color: #777;
+#ai-seo-suggestions .suggestion-explanation { /* AI Explanation */
     font-size: 0.9em;
-    display: block;
-    margin-top: 2px;
-}
-
-#ai-seo-agent-metabox .ai-seo-apply-button {
-   /* Add specific styles for apply button if needed */
-   vertical-align: middle;
-   margin-left: 8px;
-}
-
-#ai-seo-agent-metabox #ai-seo-keyword-details ul {
-    list-style: none;
-    margin-left: 0;
-    padding-left: 0;
-}
-
-#ai-seo-agent-metabox #ai-seo-keyword-details li {
+    color: #444;
+    margin-top: 8px;
     margin-bottom: 4px;
+    font-style: normal;
+    padding-left: 18px;
+    position: relative;
+    line-height: 1.4;
 }
+#ai-seo-suggestions .suggestion-explanation::before { /* Lightbulb Icon */
+    content: '\f139';
+    font-family: 'dashicons';
+    position: absolute;
+    left: 0;
+    top: 1px;
+    color: #7e4ff3; /* Purple */
+    font-size: 14px;
+}
+
+#ai-seo-suggestions .suggestion-context {
+    font-size: 0.85em;
+    color: #646970;
+    display: block;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+#ai-seo-suggestions .suggestion-action {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+}
+#ai-seo-suggestions .ai-seo-apply-button {
+    margin-right: 8px;
+}
+#ai-seo-suggestions .score-gain {
+    font-size: 0.9em;
+    color: #008a20; /* Darker Green */
+    font-weight: 600; /* Bolder */
+}
+#ai-seo-suggestions .ai-seo-apply-button:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+
+/* Keyword Analysis & Other Sections */
+.collapsible-content ul { list-style: none; margin: 0; padding: 0; }
+.collapsible-content li { margin-bottom: 5px; }
+.collapsible-content p { margin: 5px 0; }
+.collapsible-content strong { font-weight: 600; color: #1d2327; }
+
+#ai-seo-semantic-section .semantic-score { font-weight: bold; }
+#ai-seo-semantic-section .semantic-justification { font-style: italic; color: #555; margin-top: 5px;}
+
+#ai-seo-links-section .ai-link-suggestion code { background-color: #eee; padding: 2px 4px; border-radius: 3px; }
