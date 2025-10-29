@@ -1,9 +1,0 @@
-# Python virtual environment
-venv/
-
-# Secret API keys
-.env
-
-# Python cache
-__pycache__/
-*.pyc
