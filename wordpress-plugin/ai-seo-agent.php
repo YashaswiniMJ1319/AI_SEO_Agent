@@ -85,6 +85,13 @@ function ai_seo_render_meta_box_content( $post ) {
                 <!-- JS will populate this -->
             </div>
         </div>
+        <div id="ai-seo-behavior-section" class="ai-seo-section collapsible closed" style="display: none;">
+  <button type="button" class="collapsible-trigger">User Behavior Insights <span class="toggle-icon">►</span></button>
+  <div class="collapsible-content">
+    <p>This feature will activate when your site is live and AI SEO Agent can collect real visitor metrics.</p>
+  </div>
+</div>
+
 
     </div> <!-- End #ai-seo-results -->
 </div> <!-- End #ai-seo-agent-wrapper -->
@@ -164,5 +171,18 @@ add_action( 'wp_head', 'ai_seo_output_meta_description' );
 
 
 */
+// 🧠 Enqueue Behavior Tracker for frontend only
+function ai_seo_enqueue_behavior_tracker() {
+    if ( !is_admin() ) {
+        wp_enqueue_script(
+            'ai-seo-behavior-tracker',
+            plugins_url('assets/js/behavior-tracker.js', __FILE__),
+            array(),
+            '1.0',
+            true
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'ai_seo_enqueue_behavior_tracker');
 
 ?>

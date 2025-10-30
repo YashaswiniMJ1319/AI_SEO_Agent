@@ -478,5 +478,26 @@ if (type === 'ai_meta') {
     // --- Initial Setup ---
     setupCollapsibles(); // Make sections collapsible
     console.log("--- AI SEO Script Initialized and Listeners Attached ---");
+// --- existing plugin JS code above ---
+
+// Track user behavior only if site is live
+if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+  window.addEventListener("beforeunload", () => {
+    const timeSpent = Math.round(performance.now() / 1000);
+    const scrollDepth = Math.round(
+      ((window.scrollY + window.innerHeight) / document.body.scrollHeight) * 100
+    );
+
+    fetch("https://ai_seo_brain:8000/api/behavior", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        page_url: window.location.href,
+        time_spent_seconds: timeSpent,
+        scroll_depth_percent: scrollDepth,
+      }),
+    });
+  });
+}
 
 }); // End of DOMContentLoaded listener

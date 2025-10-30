@@ -8,7 +8,7 @@ router.post("/seo/analyze", async (req, res) => {
    const response = await axios.post(
   process.env.AI_SERVICE_URL || "http://ai_seo_brain:8000/analyze", // <-- CORRECTED URL
   req.body,
-  { timeout: 20000 }
+  { timeout: 60000 }
 );
 
     res.json(response.data);
