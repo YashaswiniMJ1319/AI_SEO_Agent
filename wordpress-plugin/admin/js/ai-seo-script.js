@@ -26,6 +26,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const linksContentDiv = linksSection ? linksSection.querySelector('.collapsible-content') : null;
 
     const keywordInput = document.getElementById('ai-seo-target-keyword');
+    // --- Helper: update the SEO score visually ---
+function updateSeoScore(pointsToAdd) {
+  const currentScore = parseInt(scoreValueSpan.textContent) || 0;
+  const newScore = Math.min(100, currentScore + pointsToAdd); // clamp to 100
+
+  scoreValueSpan.textContent = newScore;
+  scoreBar.style.width = `${newScore}%`;
+
+  // Update color level
+  scoreBar.className = 'score-bar';
+  if (newScore < 50) scoreBar.classList.add('low');
+  else if (newScore < 80) scoreBar.classList.add('medium');
+  else scoreBar.classList.add('high');
+
+  console.log(`SEO Score updated: ${currentScore} → ${newScore}`);
+}
+
 
     // --- Initial State & Helper Functions ---
     function setStatus(message, type = 'info') { // type: 'info', 'error', 'success'
@@ -244,7 +261,18 @@ if (type === 'ai_meta') {
                      if (statusP && statusP.classList.contains('success')) {
                          setStatus('Ready.');
                      }
-                 }, 3000); // Reset after 3 seconds
+                 }, 3000); 
+                 // Increase score visually if a score gain exists
+const scoreGainText = button.nextElementSibling?.textContent || "";
+const match = scoreGainText.match(/\+(\d+)/);
+if (match) {
+    const points = parseInt(match[1]);
+    updateSeoScore(points);
+    scoreBar.classList.add("glow");
+setTimeout(() => scoreBar.classList.remove("glow"), 1000);
+
+}
+// Reset after 3 seconds
              }
         }
     }
@@ -481,22 +509,32 @@ if (type === 'ai_meta') {
 // --- existing plugin JS code above ---
 
 // Track user behavior only if site is live
-if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+// --- Track User Behavior ---
+if (true) {  // set to true for testing locally
   window.addEventListener("beforeunload", () => {
     const timeSpent = Math.round(performance.now() / 1000);
     const scrollDepth = Math.round(
       ((window.scrollY + window.innerHeight) / document.body.scrollHeight) * 100
     );
 
-    fetch("https://ai_seo_brain:8000/api/behavior", {
+    const payload = {
+      page_url: window.location.href,
+      time_spent_seconds: timeSpent,
+      scroll_depth_percent: scrollDepth,
+      timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+    };
+
+    console.log("🧠 AI SEO Behavior Payload:", payload);
+
+    fetch("http://localhost:8000/api/behavior", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        page_url: window.location.href,
-        time_spent_seconds: timeSpent,
-        scroll_depth_percent: scrollDepth,
-      }),
-    });
+      body: JSON.stringify(payload),
+      mode: "cors",
+    })
+      .then((res) => console.log("✅ Behavior logged:", res.status))
+      .catch((err) => console.error("❌ Behavior logging failed:", err));
   });
 }
 

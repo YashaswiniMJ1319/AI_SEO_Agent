@@ -171,18 +171,43 @@ add_action( 'wp_head', 'ai_seo_output_meta_description' );
 
 
 */
+
+
 // 🧠 Enqueue Behavior Tracker for frontend only
-function ai_seo_enqueue_behavior_tracker() {
-    if ( !is_admin() ) {
-        wp_enqueue_script(
-            'ai-seo-behavior-tracker',
-            plugins_url('assets/js/behavior-tracker.js', __FILE__),
-            array(),
-            '1.0',
-            true
-        );
+// 🧠 Auto-inject Behavior Tracker script for live websites
+function ai_seo_insert_behavior_tracker() {
+    // Only run on frontend for visitors (not admins)
+    if ( is_admin() || is_user_logged_in() ) return;
+
+    // Skip if already inserted
+    if ( did_action('ai_seo_behavior_tracker_loaded') ) return;
+    do_action('ai_seo_behavior_tracker_loaded');
+
+    // Detect local or staging URLs
+    $current_host = $_SERVER['HTTP_HOST'];
+    $local_hosts = array('localhost', '127.0.0.1');
+    foreach ($local_hosts as $lh) {
+        if (stripos($current_host, $lh) !== false) {
+            // 🔇 Skip for local development
+            return;
+        }
     }
+
+    // ✅ Production tracking URLs
+    $api_url = 'https://your-fastapi-server.com/api/behavior';
+    $script_url = plugins_url('admin/js/behavior-tracker.js', __FILE__);
+
+    echo "
+    <!-- 🧠 AI SEO Behavior Tracker -->
+    <script>
+      window.aiSeoBehaviorData = { apiUrl: '{$api_url}' };
+    </script>
+    <script src='{$script_url}' async></script>
+    <!-- End AI SEO Behavior Tracker -->
+    ";
 }
-add_action('wp_enqueue_scripts', 'ai_seo_enqueue_behavior_tracker');
+add_action('wp_footer', 'ai_seo_insert_behavior_tracker', 100);
+
+
 
 ?>

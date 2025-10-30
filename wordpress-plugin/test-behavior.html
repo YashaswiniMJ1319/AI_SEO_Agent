@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Behavior Tracker Test</title>
+  <script>
+    // ✅ Define API endpoint
+    window.aiSeoBehaviorData = {
+      apiUrl: "http://localhost:8000/api/behavior"
+    };
+  </script>
+</head>
+<body style="height: 3000px; font-family: sans-serif;">
+  <h1>Scroll and wait, then close tab to send data</h1>
+  <p>Keep this page open for a few seconds, scroll a bit, and then close it.</p>
+
+  <!-- ✅ Correct relative path -->
+  <script src="admin/js/behavior-tracker.js"></script>
+</body>
+</html>

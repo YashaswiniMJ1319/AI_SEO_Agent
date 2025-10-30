@@ -224,3 +224,17 @@ p.status-text.success {
 #ai-seo-semantic-section .semantic-justification { font-style: italic; color: #555; margin-top: 5px;}
 
 #ai-seo-links-section .ai-link-suggestion code { background-color: #eee; padding: 2px 4px; border-radius: 3px; }
+/* Smooth animation when score updates */
+.score-bar {
+  transition: width 0.6s ease, background-color 0.6s ease;
+}
+
+/* Optional glow animation when score increases */
+@keyframes score-glow {
+  0% { box-shadow: 0 0 0px rgba(70,180,80,0.8); }
+  50% { box-shadow: 0 0 12px rgba(70,180,80,0.8); }
+  100% { box-shadow: 0 0 0px rgba(70,180,80,0.8); }
+}
+.score-bar.glow {
+  animation: score-glow 1s ease;
+}

@@ -1,4 +1,5 @@
 # db.py
+import psycopg2
 
 
 # Replace with your Neon DB URL

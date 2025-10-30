@@ -12,6 +12,12 @@ import json
 from urllib.parse import urlparse
 from jose import JWTError, jwt
 from fastapi import Request
+from db import get_db_connection 
+from datetime import datetime
+import psycopg2
+from fastapi.middleware.cors import CORSMiddleware
+
+
 # Note: db.py is not included, so database-related code (log_behavior) is commented out.
 
 # --- Load environment variables ---
@@ -483,6 +489,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(a
 
 # --- FastAPI App Initialization ---
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or specify your frontend origins e.g. ["https://your-site.com"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- MODULE 2: Endpoints ---
 
@@ -490,6 +503,99 @@ app = FastAPI()
 # @app.post("/api/behavior")
 # async def log_behavior(request: Request):
 #    ...
+
+# --- Live User Behavior Logging (NeonDB Integration) ---
+
+@app.post("/api/behavior")
+async def log_behavior(request: Request):
+    """
+    Collects user behavior metrics sent from the front-end plugin when users
+    visit or leave a page. Stores time spent, scroll depth, etc. in NeonDB.
+    """
+    try:
+        data = await request.json()
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # ✅ Ensure table exists
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS behavior_logs (
+                id SERIAL PRIMARY KEY,
+                page_url TEXT,
+                time_spent_seconds INT,
+                scroll_depth_percent INT,
+                timestamp TIMESTAMP DEFAULT NOW(),
+                user_agent TEXT
+            );
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_behavior_page_url 
+            ON behavior_logs(page_url);
+        """)
+
+        # ✅ Extract and safely parse timestamp
+        timestamp_str = data.get("timestamp", "")
+        try:
+            parsed_timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "").replace("T", " "))
+        except Exception:
+            parsed_timestamp = datetime.utcnow()
+
+        # ✅ Insert into table
+        cur.execute("""
+            INSERT INTO behavior_logs (page_url, time_spent_seconds, scroll_depth_percent, timestamp, user_agent)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            data.get("page_url"),
+            data.get("time_spent_seconds"),
+            data.get("scroll_depth_percent"),
+            parsed_timestamp,
+            data.get("user_agent")
+        ))
+
+        conn.commit()
+        print(f"✅ Logged behavior for {data.get('page_url')}")
+        return {"status": "ok"}
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        print(f"❌ Behavior logging failed: {e}")
+        return {"error": str(e)}
+
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
+
+
+
+@app.get("/api/behavior-insights")
+def get_behavior_summary():
+    """
+    Returns overall engagement insights from recent logs.
+    Useful for dashboard analytics or AI fine-tuning.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*), AVG(time_spent_seconds), AVG(scroll_depth_percent)
+            FROM behavior_logs
+        """)
+        total, avg_time, avg_scroll = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        return {
+            "total_records": total or 0,
+            "avg_time_spent": round(avg_time or 0, 2),
+            "avg_scroll_depth": round(avg_scroll or 0, 2)
+        }
+    except Exception as e:
+        print(f"⚠️ Behavior summary error: {e}")
+        return {"error": str(e)}
+
 
 @app.post("/analyze", response_model=SeoResponse)
 async def analyze_seo(request: SeoRequest): # Auth is disabled for MVP
@@ -623,6 +729,7 @@ async def analyze_seo(request: SeoRequest): # Auth is disabled for MVP
 
         applied_html = apply_all_suggestions(soup, suggestions, writing_report, link_report)
         
+        
     except Exception as e:
         print(f"Error during analysis: {e}")
         import traceback
@@ -630,6 +737,51 @@ async def analyze_seo(request: SeoRequest): # Auth is disabled for MVP
         raise HTTPException(status_code=500, detail=f"An error occurred during SEO analysis: {e}")
 
     final_score = max(0, min(100, seo_score)) # Clamp score
+        # --- Save AI suggestions into the database (only if not local) ---
+    try:
+        current_host = os.getenv("DEPLOYMENT_HOST", "")
+        if not ("localhost" in current_host or "127.0.0.1" in current_host):
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS suggestions (
+                    id SERIAL PRIMARY KEY,
+                    page_url TEXT,
+                    suggestion_type TEXT,
+                    message TEXT,
+                    content TEXT,
+                    explanation TEXT,
+                    potential_score_gain INT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+
+            for s in suggestions:
+                cur.execute("""
+                    INSERT INTO suggestions (page_url, suggestion_type, message, content, explanation, potential_score_gain)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    request.config.get("page_url", "unknown"),
+                    s.type,
+                    s.message,
+                    s.content,
+                    s.explanation,
+                    s.potential_score_gain
+                ))
+
+            conn.commit()
+            print(f"💾 Saved {len(suggestions)} suggestions to DB.")
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        print(f"⚠️ Failed to save suggestions: {e}")
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
+
     return SeoResponse(
         seoScore=final_score,
         issues=issues,
@@ -640,35 +792,37 @@ async def analyze_seo(request: SeoRequest): # Auth is disabled for MVP
         linkAnalysis=link_report,
         appliedHtml=applied_html,
         competitorAnalysis=competitor_report
+        
     )
 
 @app.post("/analyze-behavior", response_model=BehaviorAnalysisResponse)
-async def analyze_behavior_endpoint(request: BehaviorAnalysisRequest): # <-- Auth temporarily disabled
-    print(f"Received behavior analysis request for URL: {request.page_url}")
-    if not request.page_content_html or not request.behavior_metrics:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing page content or behavior metrics for analysis."
+async def analyze_behavior_endpoint(request: BehaviorAnalysisRequest):
+    print(f"Received behavior analysis for URL: {request.page_url}")
+
+    # Skip AI behavior analysis for local/staging
+    current_host = os.getenv("DEPLOYMENT_HOST", "")
+    if "localhost" in current_host or "127.0.0.1" in current_host:
+        return BehaviorAnalysisResponse(
+            summary="Behavior analysis is only active on live sites.",
+            suggestions=[]
         )
+
+    if not request.page_content_html or not request.behavior_metrics:
+        raise HTTPException(status_code=400, detail="Missing page content or behavior metrics")
+
     try:
         analysis_result = await get_behavioral_insights(
-            page_content_html=request.page_content_html,
-            behavior_data=request.behavior_metrics
+            request.page_content_html,
+            request.behavior_metrics
         )
         if not analysis_result:
-             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="AI failed to generate behavioral insights."
-             )
+            raise HTTPException(status_code=500, detail="AI failed to generate behavioral insights.")
         return analysis_result
     except Exception as e:
-         print(f"Error during behavior analysis processing: {e}")
-         import traceback
-         traceback.print_exc()
-         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred during behavior analysis: {e}"
-         )
+        print(f"Error during behavior analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"An error occurred during behavior analysis: {e}")
 
 @app.get("/health")
 async def health_check():

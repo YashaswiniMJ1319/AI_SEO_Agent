@@ -1,9 +1,9 @@
 // File: assets/js/behavior-tracker.js
 (function() {
-  // Run only on frontend pages, not admin/editor
+  // Avoid running in admin/editor
   if (typeof window === "undefined" || window.location.href.includes("wp-admin")) return;
 
-  console.log("AI SEO: Behavior Tracker Initialized");
+  console.log("🧠 AI SEO Behavior Tracker Loaded");
 
   const sessionStart = Date.now();
   let maxScroll = 0;
@@ -11,12 +11,12 @@
   // Track scroll depth
   window.addEventListener("scroll", () => {
     const scrollDepth = Math.floor(
-      (window.scrollY + window.innerHeight) / document.body.scrollHeight * 100
+      ((window.scrollY + window.innerHeight) / document.body.scrollHeight) * 100
     );
     if (scrollDepth > maxScroll) maxScroll = scrollDepth;
   });
 
-  // When user leaves page
+  // Send data when user leaves page
   window.addEventListener("beforeunload", () => {
     const timeSpent = Math.floor((Date.now() - sessionStart) / 1000);
     const payload = {
@@ -27,7 +27,18 @@
       user_agent: navigator.userAgent
     };
 
-    // Send data to your backend AI engine
-    navigator.sendBeacon("https://your-backend.com/api/behavior", JSON.stringify(payload));
+    // Ensure global variable exists
+    if (typeof aiSeoBehaviorData === "undefined" || !aiSeoBehaviorData.apiUrl) {
+      console.warn("⚠️ AI SEO: apiUrl not configured. Behavior data not sent.");
+      return;
+    }
+
+    try {
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      navigator.sendBeacon(aiSeoBehaviorData.apiUrl, blob);
+      console.log("✅ Behavior data sent to:", aiSeoBehaviorData.apiUrl);
+    } catch (err) {
+      console.error("❌ Behavior tracking failed:", err);
+    }
   });
 })();
