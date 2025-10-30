@@ -238,3 +238,32 @@ p.status-text.success {
 .score-bar.glow {
   animation: score-glow 1s ease;
 }
+/* Competitor & Behavior Sections */
+#ai-seo-competitors-section ul,
+#ai-seo-behavior-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#ai-seo-competitors-section li,
+#ai-seo-behavior-section li {
+  background: #f6f7f7;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #1d2327;
+}
+
+#ai-seo-competitors-section li strong {
+  color: #2271b1;
+}
+
+#ai-seo-behavior-section p {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.5;
+  margin: 6px 0;
+}
